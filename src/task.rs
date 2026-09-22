@@ -32,6 +32,27 @@ pub enum Check {
     MinDecisionConfidence { threshold: f64 },
     /// DRC must report zero errors.
     DrcClean,
+    /// A sine sweep driven into the rendered circuit's input net must show
+    /// real clipping/gain-compression behavior — not a schematic-reading
+    /// guess, an actual measured SPICE claim (legion-of-bom's
+    /// `scope_probe`/`simulate_tran_drive`, live-validated against real
+    /// fuzz circuits: asymmetric BJT clipping, onset ~100-300mV,
+    /// saturating toward 80-96% flat-top by 2V).
+    ///
+    /// `input_net_hint` is optional — the runner's `lob scope-probe`
+    /// subcommand falls back to its own net-recognition when absent.
+    /// `min_amplitude_v`/`max_amplitude_v` bound the sweep; the check
+    /// passes when the flat-topping fraction at `max_amplitude_v` clears
+    /// `min_flat_top_at_max`. A task-specific sweep, not a universal
+    /// default — the runner only invokes `scope-probe` when a task's
+    /// rubric actually declares this check, unlike `DrcClean`/`StagesPass`
+    /// which always run.
+    SpiceClips {
+        input_net_hint: Option<String>,
+        min_amplitude_v: f64,
+        max_amplitude_v: f64,
+        min_flat_top_at_max: f64,
+    },
     /// Not automated — a human fills this in. Named explicitly (not just
     /// "no check implemented yet") so a task file is honest about what it
     /// can't verify itself, and so "later every eval needs to be objective"
@@ -81,6 +102,23 @@ mod tests {
             matches!(back.rubric[1].check, Check::MinDecisionConfidence { threshold } if threshold == 0.7)
         );
         assert!(matches!(back.rubric[3].check, Check::Subjective));
+    }
+
+    #[test]
+    fn spice_clips_round_trips_with_an_optional_net_hint() {
+        let check = Check::SpiceClips {
+            input_net_hint: Some("IN".into()),
+            min_amplitude_v: 0.1,
+            max_amplitude_v: 2.0,
+            min_flat_top_at_max: 0.8,
+        };
+        let text = toml::to_string_pretty(&check).unwrap();
+        let back: Check = toml::from_str(&text).unwrap();
+        assert!(matches!(
+            back,
+            Check::SpiceClips { input_net_hint: Some(ref h), min_flat_top_at_max, .. }
+                if h == "IN" && min_flat_top_at_max == 0.8
+        ));
     }
 
     /// Every shipped task file is part of the harness's contract, not sample

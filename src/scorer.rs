@@ -27,6 +27,10 @@ fn score_one(criterion: &Criterion, run: &RunResult) -> CriterionResult {
         Check::StagesPass => score_stages_pass(run),
         Check::MinDecisionConfidence { threshold } => score_min_confidence(run, *threshold),
         Check::DrcClean => score_drc_clean(run),
+        Check::SpiceClips {
+            min_flat_top_at_max,
+            ..
+        } => score_spice_clips(run, *min_flat_top_at_max),
         Check::Subjective => (Verdict::NeedsHuman, "needs human review".to_string()),
     };
     CriterionResult {
@@ -99,6 +103,38 @@ fn score_drc_clean(run: &RunResult) -> (Verdict, String) {
             )
         }
     }
+}
+
+fn score_spice_clips(run: &RunResult, min_flat_top_at_max: f64) -> (Verdict, String) {
+    let Some(path) = &run.scope_probe_json else {
+        return (
+            Verdict::Fail,
+            "scope-probe did not produce a report".to_string(),
+        );
+    };
+    match read_flat_top(path) {
+        Ok(flat_top) if flat_top >= min_flat_top_at_max => (
+            Verdict::Pass,
+            format!("flat-top {flat_top:.2} >= {min_flat_top_at_max:.2} at max amplitude"),
+        ),
+        Ok(flat_top) => (
+            Verdict::Fail,
+            format!("flat-top {flat_top:.2} < {min_flat_top_at_max:.2} at max amplitude"),
+        ),
+        Err(e) => (
+            Verdict::Fail,
+            format!("could not read scope-probe report: {e}"),
+        ),
+    }
+}
+
+fn read_flat_top(path: &Path) -> anyhow::Result<f64> {
+    let text = std::fs::read_to_string(path)?;
+    let report: Value = serde_json::from_str(&text)?;
+    report
+        .get("flat_top_at_max")
+        .and_then(Value::as_f64)
+        .ok_or_else(|| anyhow::anyhow!("report missing flat_top_at_max"))
 }
 
 fn read_trace_confidences(path: &Path) -> anyhow::Result<Vec<(String, f64)>> {
@@ -174,6 +210,44 @@ mod tests {
         let (verdict, detail) = score_min_confidence(&run, 0.7);
         assert_eq!(verdict, Verdict::Fail);
         assert!(detail.contains("no decision trace"));
+    }
+
+    #[test]
+    fn spice_clips_passes_when_flat_top_clears_the_threshold() {
+        let dir = std::env::temp_dir().join(format!("pcbbench-test-sc-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let report_path = dir.join("scope-probe.json");
+        std::fs::write(&report_path, r#"{"flat_top_at_max":0.91}"#).unwrap();
+        let run = RunResult {
+            scope_probe_json: Some(report_path),
+            ..Default::default()
+        };
+        let (verdict, detail) = score_spice_clips(&run, 0.8);
+        assert_eq!(verdict, Verdict::Pass);
+        assert!(detail.contains("0.91"));
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn spice_clips_fails_when_flat_top_misses_the_threshold() {
+        let dir = std::env::temp_dir().join(format!("pcbbench-test-sc2-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let report_path = dir.join("scope-probe.json");
+        std::fs::write(&report_path, r#"{"flat_top_at_max":0.42}"#).unwrap();
+        let run = RunResult {
+            scope_probe_json: Some(report_path),
+            ..Default::default()
+        };
+        let (verdict, _) = score_spice_clips(&run, 0.8);
+        assert_eq!(verdict, Verdict::Fail);
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn spice_clips_missing_report_fails_not_panics() {
+        let (verdict, detail) = score_spice_clips(&RunResult::default(), 0.8);
+        assert_eq!(verdict, Verdict::Fail);
+        assert!(detail.contains("did not produce a report"));
     }
 
     #[test]

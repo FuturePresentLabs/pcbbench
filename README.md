@@ -1,7 +1,7 @@
 # PCBBench
 
 [![license](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue.svg)](#license)
-[![tests](https://img.shields.io/badge/tests-10%20passing-brightgreen.svg)](#status)
+[![tests](https://img.shields.io/badge/tests-14%20passing-brightgreen.svg)](#status)
 [![evals](https://img.shields.io/badge/evals-20-orange.svg)](#tasks)
 [![status](https://img.shields.io/badge/status-runs%20end%20to%20end-success.svg)](#status)
 
@@ -156,11 +156,41 @@ kind = "subjective"
 ```
 
 Every rubric criterion is either **objective** (`stages_pass`,
-`min_decision_confidence`, `drc_clean` today — a pure function of captured
-artifacts, no human judgment) or **`subjective`** (explicitly not automated
-yet, so a task file is honest about what it can't verify itself). The goal
-is for that second category to shrink over time, not to stay a permanent
-escape hatch.
+`min_decision_confidence`, `drc_clean`, `spice_clips` today — a pure
+function of captured artifacts, no human judgment) or **`subjective`**
+(explicitly not automated yet, so a task file is honest about what it
+can't verify itself). The goal is for that second category to shrink over
+time, not to stay a permanent escape hatch.
+
+### `spice_clips`, and its known gap
+
+```toml
+[[rubric]]
+id = "clips"
+description = "input sweep shows real clipping, not a schematic-reading guess"
+kind = "spice_clips"
+min_amplitude_v = 0.1
+max_amplitude_v = 2.0
+min_flat_top_at_max = 0.8
+```
+
+A sine sweep driven into the rendered circuit's input net, scored on the
+flat-topping fraction at `max_amplitude_v` — legion-of-bom's own
+`scope_probe`/`simulate_tran_drive`, live-validated against real fuzz
+circuits (asymmetric BJT clipping, onset ~100-300mV, 80-96% flat-top by
+2V). `input_net_hint` is optional.
+
+**Known gap, same honesty `cadbench` holds `conforms` to**: the runner
+shells out to a `lob scope-probe` subcommand that does not exist in
+legion-of-bom yet (`lob spec`/`schematic`/`run`/`board`/`drc` do). Only
+invoked when a task's rubric actually declares `spice_clips` — no shipped
+task does yet. Expected contract:
+`lob scope-probe <schematic.py> [--input-net-hint NAME] --min-amplitude V --max-amplitude V --out <report.json>`,
+exit 0 whenever the measurement itself ran (regardless of what it found),
+writing `{"flat_top_at_max": <f64>, ...}` to `--out`. The stage
+deliberately doesn't gate `run`/`board`/`drc` — a SPICE measurement
+failing to run is an independent fact from whether the board layout
+succeeds.
 
 ## Alternatives
 

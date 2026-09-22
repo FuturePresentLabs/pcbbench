@@ -75,6 +75,10 @@ pub struct RunResult {
     pub decision_trace: Option<PathBuf>,
     pub panel_toml: Option<PathBuf>,
     pub board_kicad_pcb: Option<PathBuf>,
+    /// `lob scope-probe`'s report, when a `Check::SpiceClips` criterion
+    /// asked for it — absent whenever no task criterion needs it, same as
+    /// every other optional artifact here.
+    pub scope_probe_json: Option<PathBuf>,
 }
 
 /// Drives the `lob` CLI out of a legion-of-bom checkout (or any binary on
@@ -201,6 +205,43 @@ impl Backend<Check> for LobBackend {
         result.schematic_py = Some(schematic_py.clone());
         if panel_toml.exists() {
             result.panel_toml = Some(panel_toml.clone());
+        }
+
+        if let Some(Check::SpiceClips {
+            input_net_hint,
+            min_amplitude_v,
+            max_amplitude_v,
+            ..
+        }) = task
+            .rubric
+            .iter()
+            .map(|c| &c.check)
+            .find(|c| matches!(c, Check::SpiceClips { .. }))
+        {
+            let scope_probe_json = work_dir.join("scope-probe.json");
+            let mut cmd = Command::new(&self.lob_bin);
+            cmd.arg("scope-probe")
+                .arg(&schematic_py)
+                .arg("--min-amplitude")
+                .arg(min_amplitude_v.to_string())
+                .arg("--max-amplitude")
+                .arg(max_amplitude_v.to_string())
+                .arg("--out")
+                .arg(&scope_probe_json);
+            if let Some(hint) = input_net_hint {
+                cmd.arg("--input-net-hint").arg(hint);
+            }
+            // Deliberately no early-return on failure here: a SPICE
+            // measurement stage failing to run (crashed, no recognizable
+            // input net) is worth recording, but board/DRC layout scoring
+            // is an independent fact about the design and shouldn't be
+            // blocked by it -- unlike spec/schematic/run/board, which each
+            // other stage genuinely depends on.
+            let stage = self.stage("scope-probe", &mut cmd)?;
+            if stage.passed() && scope_probe_json.exists() {
+                result.scope_probe_json = Some(scope_probe_json);
+            }
+            result.stages.push(stage);
         }
 
         let stage = self.stage(

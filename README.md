@@ -45,10 +45,10 @@ different set of subprocess calls, not a different architecture.
 ## Status
 
 Early (v0.1). One task (`tasks/fuzz-pedal-v1.toml`, a guitar fuzz pedal), one
-backend (legion-of-bom), and the runner currently wires `spec → schematic →
-run` — it doesn't yet drive `board`/`panel`/`drc`, so board-level rubric
-criteria (like `drc_clean`) will honestly report "did not run" rather than a
-false pass. That's the next real increment, not a bug.
+backend (legion-of-bom). The runner wires the full `spec → schematic → run →
+board → drc` chain, deriving the panel TOML from the spec's enclosure-size
+decision along the way — so `drc_clean` is a real pass/fail against a board
+legion-of-bom actually placed and routed, not a "did not run".
 
 We're planning to publish real benchmark results here as the design-agent
 and rubric mature — this repo being public from the start is part of that.

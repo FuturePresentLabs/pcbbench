@@ -49,7 +49,12 @@ fn main() -> Result<()> {
     }
 }
 
-fn run_cmd(task_path: PathBuf, lob: PathBuf, work_dir: PathBuf, spec: Option<PathBuf>) -> Result<()> {
+fn run_cmd(
+    task_path: PathBuf,
+    lob: PathBuf,
+    work_dir: PathBuf,
+    spec: Option<PathBuf>,
+) -> Result<()> {
     let text = std::fs::read_to_string(&task_path)
         .with_context(|| format!("reading {}", task_path.display()))?;
     let task: Task =
@@ -80,7 +85,11 @@ fn run_cmd(task_path: PathBuf, lob: PathBuf, work_dir: PathBuf, spec: Option<Pat
             Some(false) => "FAIL",
             None => "?   ",
         };
-        let kind = if r.objective { "objective" } else { "subjective" };
+        let kind = if r.objective {
+            "objective"
+        } else {
+            "subjective"
+        };
         println!("  [{mark}] ({kind}) {} -- {}", r.description, r.detail);
     }
 

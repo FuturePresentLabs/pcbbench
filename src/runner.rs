@@ -40,6 +40,8 @@ pub struct RunResult {
     pub spec_json: Option<PathBuf>,
     pub schematic_py: Option<PathBuf>,
     pub decision_trace: Option<PathBuf>,
+    pub panel_toml: Option<PathBuf>,
+    pub board_kicad_pcb: Option<PathBuf>,
 }
 
 /// Drive `lob` through concept → spec → design for `task`, writing
@@ -90,13 +92,16 @@ pub fn run(
     }
 
     let schematic_py = work_dir.join("circuit.py");
+    let panel_toml = work_dir.join("panel.toml");
     let stage = run_stage(
         "schematic",
         Command::new(lob_bin)
             .arg("schematic")
             .arg(&spec_json)
             .arg("--out")
-            .arg(&schematic_py),
+            .arg(&schematic_py)
+            .arg("--panel")
+            .arg(&panel_toml),
     )?;
     let passed = stage.passed();
     result.stages.push(stage);
@@ -104,8 +109,39 @@ pub fn run(
         return Ok(result);
     }
     result.schematic_py = Some(schematic_py.clone());
+    if panel_toml.exists() {
+        result.panel_toml = Some(panel_toml.clone());
+    }
 
     let stage = run_stage("run", Command::new(lob_bin).arg("run").arg(&schematic_py))?;
+    let passed = stage.passed();
+    result.stages.push(stage);
+    if !passed {
+        return Ok(result);
+    }
+
+    let board_kicad_pcb = work_dir.join("board.kicad_pcb");
+    let stage = run_stage(
+        "board",
+        Command::new(lob_bin)
+            .arg("board")
+            .arg(&schematic_py)
+            .arg("--panel")
+            .arg(&panel_toml)
+            .arg("--out")
+            .arg(&board_kicad_pcb),
+    )?;
+    let passed = stage.passed();
+    result.stages.push(stage);
+    if !passed {
+        return Ok(result);
+    }
+    result.board_kicad_pcb = Some(board_kicad_pcb.clone());
+
+    let stage = run_stage(
+        "drc",
+        Command::new(lob_bin).arg("drc").arg(&board_kicad_pcb),
+    )?;
     result.stages.push(stage);
 
     Ok(result)

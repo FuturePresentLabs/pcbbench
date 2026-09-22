@@ -32,7 +32,8 @@ impl ScoreReport {
     /// `(passed, total)` counted over objective criteria only — a
     /// subjective criterion has no pass/fail to count yet.
     pub fn objective_pass_count(&self) -> (usize, usize) {
-        let objective: Vec<&CriterionResult> = self.results.iter().filter(|r| r.objective).collect();
+        let objective: Vec<&CriterionResult> =
+            self.results.iter().filter(|r| r.objective).collect();
         let passed = objective.iter().filter(|r| r.passed == Some(true)).count();
         (passed, objective.len())
     }

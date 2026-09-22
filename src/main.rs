@@ -3,8 +3,9 @@ use std::path::PathBuf;
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 
+use pcbbench::runner::{Backend, LobBackend};
+use pcbbench::scorer::score;
 use pcbbench::task::Task;
-use pcbbench::{runner, scorer};
 
 #[derive(Parser)]
 #[command(
@@ -61,7 +62,15 @@ fn run_cmd(
         toml::from_str(&text).with_context(|| format!("parsing {}", task_path.display()))?;
 
     println!("pcbbench run: {} ({})", task.id, task.family);
-    let result = runner::run(&lob, &task, &work_dir, spec.as_deref())?;
+
+    let mut backend = LobBackend::new(&lob);
+    if let Some(spec_path) = spec {
+        backend = backend.with_spec(spec_path);
+    }
+    let result = backend
+        .run(&task, &work_dir)
+        .with_context(|| format!("running {} against {}", backend.name(), task.id))?;
+
     for stage in &result.stages {
         println!(
             "  [{}] {}",
@@ -75,27 +84,31 @@ fn run_cmd(
         }
     }
 
-    let report = scorer::score(&task, &result);
+    let report = score(&task, &result);
     println!("\nScore report for {}:", report.task_id);
-    let (passed, total) = report.objective_pass_count();
-    println!("  objective: {passed}/{total} passed");
     for r in &report.results {
-        let mark = match r.passed {
-            Some(true) => "PASS",
-            Some(false) => "FAIL",
-            None => "?   ",
+        let mark = match r.verdict {
+            eval::Verdict::Pass => "PASS",
+            eval::Verdict::Fail => "FAIL",
+            eval::Verdict::NeedsHuman => "?   ",
         };
-        let kind = if r.objective {
-            "objective"
-        } else {
-            "subjective"
-        };
-        println!("  [{mark}] ({kind}) {} -- {}", r.description, r.detail);
+        println!("  [{mark}] {} -- {}", r.description, r.detail);
+    }
+    if !report.needs_human().is_empty() {
+        println!(
+            "\nnote: criteria still need a human: {}",
+            report.needs_human().join(", ")
+        );
     }
 
     let report_path = work_dir.join("report.json");
     std::fs::write(&report_path, serde_json::to_string_pretty(&report)?)
         .with_context(|| format!("writing {}", report_path.display()))?;
     println!("\nwrote {}", report_path.display());
-    Ok(())
+
+    if report.all_automated_pass() {
+        Ok(())
+    } else {
+        anyhow::bail!("not every automated criterion passed");
+    }
 }

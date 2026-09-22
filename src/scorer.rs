@@ -2,70 +2,44 @@
 //! report. Every objective [`Check`] here is a pure function of already-
 //! captured artifacts — no network, no re-running the backend.
 
+pub use eval::{CriterionResult, ScoreReport, Verdict};
+
 use std::path::Path;
 
-use serde::Serialize;
 use serde_json::Value;
 
 use crate::runner::RunResult;
 use crate::task::{Check, Criterion, Task};
 
-/// One criterion's outcome. `passed: None` means "not automated" — a
-/// [`Check::Subjective`] criterion — never "unknown due to an error" (an
-/// error while checking is a `Some(false)` with the reason in `detail`).
-#[derive(Debug, Clone, Serialize)]
-pub struct CriterionResult {
-    pub id: String,
-    pub description: String,
-    pub objective: bool,
-    pub passed: Option<bool>,
-    pub detail: String,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct ScoreReport {
-    pub task_id: String,
-    pub results: Vec<CriterionResult>,
-}
-
-impl ScoreReport {
-    /// `(passed, total)` counted over objective criteria only — a
-    /// subjective criterion has no pass/fail to count yet.
-    pub fn objective_pass_count(&self) -> (usize, usize) {
-        let objective: Vec<&CriterionResult> =
-            self.results.iter().filter(|r| r.objective).collect();
-        let passed = objective.iter().filter(|r| r.passed == Some(true)).count();
-        (passed, objective.len())
-    }
-}
-
+/// Scores `run` against `task`'s rubric.
+#[must_use]
 pub fn score(task: &Task, run: &RunResult) -> ScoreReport {
     let results = task.rubric.iter().map(|c| score_one(c, run)).collect();
     ScoreReport {
         task_id: task.id.clone(),
+        backend: run.backend.clone(),
         results,
     }
 }
 
 fn score_one(criterion: &Criterion, run: &RunResult) -> CriterionResult {
-    let (objective, passed, detail) = match &criterion.check {
+    let (verdict, detail) = match &criterion.check {
         Check::StagesPass => score_stages_pass(run),
         Check::MinDecisionConfidence { threshold } => score_min_confidence(run, *threshold),
         Check::DrcClean => score_drc_clean(run),
-        Check::Subjective => (false, None, "needs human review".to_string()),
+        Check::Subjective => (Verdict::NeedsHuman, "needs human review".to_string()),
     };
     CriterionResult {
         id: criterion.id.clone(),
         description: criterion.description.clone(),
-        objective,
-        passed,
+        verdict,
         detail,
     }
 }
 
-fn score_stages_pass(run: &RunResult) -> (bool, Option<bool>, String) {
+fn score_stages_pass(run: &RunResult) -> (Verdict, String) {
     if run.stages.is_empty() {
-        return (true, Some(false), "no stages ran".to_string());
+        return (Verdict::Fail, "no stages ran".to_string());
     }
     let failed: Vec<&str> = run
         .stages
@@ -75,22 +49,21 @@ fn score_stages_pass(run: &RunResult) -> (bool, Option<bool>, String) {
         .collect();
     if failed.is_empty() {
         (
-            true,
-            Some(true),
+            Verdict::Pass,
             format!("all {} stage(s) exited 0", run.stages.len()),
         )
     } else {
-        (true, Some(false), format!("failed: {}", failed.join(", ")))
+        (Verdict::Fail, format!("failed: {}", failed.join(", ")))
     }
 }
 
-fn score_min_confidence(run: &RunResult, threshold: f64) -> (bool, Option<bool>, String) {
+fn score_min_confidence(run: &RunResult, threshold: f64) -> (Verdict, String) {
     let Some(path) = &run.decision_trace else {
-        return (true, Some(false), "no decision trace captured".to_string());
+        return (Verdict::Fail, "no decision trace captured".to_string());
     };
     match read_trace_confidences(path) {
         Ok(confidences) if confidences.is_empty() => {
-            (true, Some(false), "decision trace was empty".to_string())
+            (Verdict::Fail, "decision trace was empty".to_string())
         }
         Ok(confidences) => {
             let below: Vec<String> = confidences
@@ -100,29 +73,30 @@ fn score_min_confidence(run: &RunResult, threshold: f64) -> (bool, Option<bool>,
                 .collect();
             if below.is_empty() {
                 (
-                    true,
-                    Some(true),
+                    Verdict::Pass,
                     format!("all {} decision(s) >= {threshold:.2}", confidences.len()),
                 )
             } else {
                 (
-                    true,
-                    Some(false),
+                    Verdict::Fail,
                     format!("below {threshold:.2}: {}", below.join(", ")),
                 )
             }
         }
-        Err(e) => (true, Some(false), format!("could not read trace: {e}")),
+        Err(e) => (Verdict::Fail, format!("could not read trace: {e}")),
     }
 }
 
-fn score_drc_clean(run: &RunResult) -> (bool, Option<bool>, String) {
+fn score_drc_clean(run: &RunResult) -> (Verdict, String) {
     match run.stages.iter().find(|s| s.stage == "drc") {
-        None => (true, Some(false), "drc stage did not run".to_string()),
+        None => (Verdict::Fail, "drc stage did not run".to_string()),
         Some(s) => {
             let first_line = s.stdout.lines().next().unwrap_or("").to_string();
             let clean = s.passed() && s.stdout.contains(": 0 error(s)");
-            (true, Some(clean), first_line)
+            (
+                if clean { Verdict::Pass } else { Verdict::Fail },
+                first_line,
+            )
         }
     }
 }
@@ -161,17 +135,16 @@ mod tests {
             stages: vec![stage("spec", true), stage("schematic", false)],
             ..Default::default()
         };
-        let (objective, passed, detail) = score_stages_pass(&run);
-        assert!(objective);
-        assert_eq!(passed, Some(false));
+        let (verdict, detail) = score_stages_pass(&run);
+        assert_eq!(verdict, Verdict::Fail);
         assert!(detail.contains("schematic"));
     }
 
     #[test]
     fn stages_pass_with_no_stages_is_a_failure_not_a_vacuous_pass() {
         let run = RunResult::default();
-        let (_, passed, _) = score_stages_pass(&run);
-        assert_eq!(passed, Some(false));
+        let (verdict, _) = score_stages_pass(&run);
+        assert_eq!(verdict, Verdict::Fail);
     }
 
     #[test]
@@ -189,8 +162,8 @@ mod tests {
             decision_trace: Some(trace_path),
             ..Default::default()
         };
-        let (_, passed, detail) = score_min_confidence(&run, 0.7);
-        assert_eq!(passed, Some(false));
+        let (verdict, detail) = score_min_confidence(&run, 0.7);
+        assert_eq!(verdict, Verdict::Fail);
         assert!(detail.contains("b=0.40"));
         std::fs::remove_dir_all(&dir).ok();
     }
@@ -198,8 +171,8 @@ mod tests {
     #[test]
     fn min_confidence_missing_trace_fails_not_panics() {
         let run = RunResult::default();
-        let (_, passed, detail) = score_min_confidence(&run, 0.7);
-        assert_eq!(passed, Some(false));
+        let (verdict, detail) = score_min_confidence(&run, 0.7);
+        assert_eq!(verdict, Verdict::Fail);
         assert!(detail.contains("no decision trace"));
     }
 
@@ -216,8 +189,24 @@ mod tests {
             }],
         };
         let report = score(&task, &RunResult::default());
-        assert_eq!(report.results[0].passed, None);
-        assert!(!report.results[0].objective);
-        assert_eq!(report.objective_pass_count(), (0, 0));
+        assert_eq!(report.results[0].verdict, Verdict::NeedsHuman);
+        assert!(report.all_automated_pass());
+        assert_eq!(report.needs_human(), vec!["vibe"]);
+    }
+
+    #[test]
+    fn a_real_fail_shows_up_in_all_automated_pass() {
+        let task = Task {
+            id: "t".into(),
+            family: "fuzz-pedal".into(),
+            brief: "b".into(),
+            rubric: vec![Criterion {
+                id: "stages".into(),
+                description: "d".into(),
+                check: Check::StagesPass,
+            }],
+        };
+        let report = score(&task, &RunResult::default());
+        assert!(!report.all_automated_pass());
     }
 }

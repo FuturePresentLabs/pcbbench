@@ -1,7 +1,7 @@
 # PCBBench
 
 [![license](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue.svg)](#license)
-[![tests](https://img.shields.io/badge/tests-8%20passing-brightgreen.svg)](#status)
+[![tests](https://img.shields.io/badge/tests-10%20passing-brightgreen.svg)](#status)
 [![evals](https://img.shields.io/badge/evals-20-orange.svg)](#tasks)
 [![status](https://img.shields.io/badge/status-runs%20end%20to%20end-success.svg)](#status)
 
@@ -51,7 +51,7 @@ architecture.
 
 ## Status
 
-**Runs end to end.** 8 unit tests, 20 tasks, one backend (legion-of-bom).
+**Runs end to end.** 10 unit tests, 20 tasks, one backend (legion-of-bom).
 The runner wires the full `spec → schematic → run → board → drc` chain,
 deriving the panel TOML from the spec's enclosure-size decision along the
 way — so `drc_clean` is a real pass/fail against a board legion-of-bom

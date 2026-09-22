@@ -5,13 +5,41 @@
 //! invocations, not a different architecture (this is the whole point of
 //! going through a subprocess boundary rather than linking `lob` as a
 //! library).
+//!
+//! The seam itself ([`Backend`]) is [`eval::Backend`] — shared with
+//! cadbench and any future sibling harness. `Outcome`/`Error` are this
+//! crate's own associated types; nothing about them is generic.
+
+pub use eval::Backend;
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use anyhow::{Context, Result};
+use crate::task::{Check, Task};
 
-use crate::task::Task;
+/// Failures that stop a run before it can be scored.
+#[derive(Debug, thiserror::Error)]
+pub enum RunError {
+    #[error("creating work directory {path}")]
+    Workdir {
+        path: String,
+        #[source]
+        source: std::io::Error,
+    },
+    #[error("spawning stage {stage:?}: {program}")]
+    Spawn {
+        stage: String,
+        program: String,
+        #[source]
+        source: std::io::Error,
+    },
+    #[error("copying existing spec from {path}")]
+    CopySpec {
+        path: String,
+        #[source]
+        source: std::io::Error,
+    },
+}
 
 /// One subprocess run's outcome — exit status + captured output, kept for
 /// the scorer and for a human to inspect after the fact.
@@ -19,12 +47,14 @@ use crate::task::Task;
 pub struct StageRun {
     pub stage: String,
     pub command: String,
+    /// `None` if the process was killed by a signal.
     pub exit_code: Option<i32>,
     pub stdout: String,
     pub stderr: String,
 }
 
 impl StageRun {
+    #[must_use]
     pub fn passed(&self) -> bool {
         self.exit_code == Some(0)
     }
@@ -36,6 +66,9 @@ impl StageRun {
 /// attempted.
 #[derive(Debug, Clone, Default)]
 pub struct RunResult {
+    /// Short identifier of the backend that produced this run (matches
+    /// [`Backend::name`]) — threaded through to [`eval::ScoreReport::backend`].
+    pub backend: String,
     pub stages: Vec<StageRun>,
     pub spec_json: Option<PathBuf>,
     pub schematic_py: Option<PathBuf>,
@@ -44,121 +77,168 @@ pub struct RunResult {
     pub board_kicad_pcb: Option<PathBuf>,
 }
 
-/// Drive `lob` through concept → spec → design for `task`, writing
-/// artifacts under `work_dir`.
-///
-/// `existing_spec`, when given, skips the live decision-making step
-/// (`lob spec`, which needs a reachable SystemOne/Jev-compatible endpoint)
-/// and starts from an already-written spec JSON instead — for replaying or
-/// testing the rest of the pipeline without a network call, the same
-/// concept-vs-design split `lob schematic` itself is built around.
-pub fn run(
-    lob_bin: &Path,
-    task: &Task,
-    work_dir: &Path,
-    existing_spec: Option<&Path>,
-) -> Result<RunResult> {
-    std::fs::create_dir_all(work_dir).context("creating work dir")?;
-    let mut result = RunResult::default();
+/// Drives the `lob` CLI out of a legion-of-bom checkout (or any binary on
+/// `PATH` matching its subcommand surface).
+#[derive(Debug, Clone)]
+pub struct LobBackend {
+    /// Path to the `lob` binary.
+    pub lob_bin: PathBuf,
+    /// Skips the live decision-making step (`lob spec`, which needs a
+    /// reachable SystemOne/Jev-compatible endpoint) and starts from an
+    /// already-written spec JSON instead — for replaying or testing the
+    /// rest of the pipeline without a network call, the same concept-vs-
+    /// design split `lob schematic` itself is built around.
+    pub existing_spec: Option<PathBuf>,
+}
 
-    let spec_json = work_dir.join("design.json");
-    let trace_json = work_dir.join("design.trace.json");
+impl LobBackend {
+    /// A backend driven through a `lob` binary.
+    #[must_use]
+    pub fn new(lob_bin: impl Into<PathBuf>) -> Self {
+        Self {
+            lob_bin: lob_bin.into(),
+            existing_spec: None,
+        }
+    }
 
-    if let Some(existing) = existing_spec {
-        std::fs::copy(existing, &spec_json)
-            .with_context(|| format!("copying existing spec from {}", existing.display()))?;
-    } else {
-        let stage = run_stage(
-            "spec",
-            Command::new(lob_bin)
-                .arg("spec")
-                .arg(&task.family)
-                .arg("--brief")
-                .arg(&task.brief)
+    /// Skips the design stage, starting from an already-written spec JSON.
+    #[must_use]
+    pub fn with_spec(mut self, existing_spec: impl Into<PathBuf>) -> Self {
+        self.existing_spec = Some(existing_spec.into());
+        self
+    }
+
+    /// Runs one `lob` subcommand, capturing everything it said.
+    ///
+    /// A non-zero exit is recorded, not raised: a backend that fails a
+    /// stage is a result the rubric has an opinion about.
+    fn stage(&self, name: &str, cmd: &mut Command) -> Result<StageRun, RunError> {
+        let command_str = format!("{cmd:?}");
+        let output = cmd.output().map_err(|source| RunError::Spawn {
+            stage: name.to_owned(),
+            program: self.lob_bin.display().to_string(),
+            source,
+        })?;
+        Ok(StageRun {
+            stage: name.to_owned(),
+            command: command_str,
+            exit_code: output.status.code(),
+            stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+            stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+        })
+    }
+}
+
+impl Backend<Check> for LobBackend {
+    type Outcome = RunResult;
+    type Error = RunError;
+
+    fn name(&self) -> &str {
+        "legion-of-bom"
+    }
+
+    /// Drive `lob` through concept → spec → schematic → run → board → drc
+    /// for `task`, writing artifacts under `work_dir`.
+    fn run(&self, task: &Task, work_dir: &Path) -> Result<RunResult, RunError> {
+        std::fs::create_dir_all(work_dir).map_err(|source| RunError::Workdir {
+            path: work_dir.display().to_string(),
+            source,
+        })?;
+        let mut result = RunResult {
+            backend: self.name().to_owned(),
+            ..RunResult::default()
+        };
+
+        let spec_json = work_dir.join("design.json");
+        let trace_json = work_dir.join("design.trace.json");
+
+        if let Some(existing) = &self.existing_spec {
+            std::fs::copy(existing, &spec_json).map_err(|source| RunError::CopySpec {
+                path: existing.display().to_string(),
+                source,
+            })?;
+        } else {
+            let stage = self.stage(
+                "spec",
+                Command::new(&self.lob_bin)
+                    .arg("spec")
+                    .arg(&task.family)
+                    .arg("--brief")
+                    .arg(&task.brief)
+                    .arg("--out")
+                    .arg(work_dir.join("design"))
+                    .arg("--trace")
+                    .arg(&trace_json),
+            )?;
+            let passed = stage.passed();
+            result.stages.push(stage);
+            if !passed {
+                return Ok(result);
+            }
+        }
+        result.spec_json = Some(spec_json.clone());
+        if trace_json.exists() {
+            result.decision_trace = Some(trace_json);
+        }
+
+        let schematic_py = work_dir.join("circuit.py");
+        let panel_toml = work_dir.join("panel.toml");
+        let stage = self.stage(
+            "schematic",
+            Command::new(&self.lob_bin)
+                .arg("schematic")
+                .arg(&spec_json)
                 .arg("--out")
-                .arg(work_dir.join("design"))
-                .arg("--trace")
-                .arg(&trace_json),
+                .arg(&schematic_py)
+                .arg("--panel")
+                .arg(&panel_toml),
         )?;
         let passed = stage.passed();
         result.stages.push(stage);
         if !passed {
             return Ok(result);
         }
-    }
-    result.spec_json = Some(spec_json.clone());
-    if trace_json.exists() {
-        result.decision_trace = Some(trace_json);
-    }
+        result.schematic_py = Some(schematic_py.clone());
+        if panel_toml.exists() {
+            result.panel_toml = Some(panel_toml.clone());
+        }
 
-    let schematic_py = work_dir.join("circuit.py");
-    let panel_toml = work_dir.join("panel.toml");
-    let stage = run_stage(
-        "schematic",
-        Command::new(lob_bin)
-            .arg("schematic")
-            .arg(&spec_json)
-            .arg("--out")
-            .arg(&schematic_py)
-            .arg("--panel")
-            .arg(&panel_toml),
-    )?;
-    let passed = stage.passed();
-    result.stages.push(stage);
-    if !passed {
-        return Ok(result);
+        let stage = self.stage(
+            "run",
+            Command::new(&self.lob_bin).arg("run").arg(&schematic_py),
+        )?;
+        let passed = stage.passed();
+        result.stages.push(stage);
+        if !passed {
+            return Ok(result);
+        }
+
+        let board_kicad_pcb = work_dir.join("board.kicad_pcb");
+        let stage = self.stage(
+            "board",
+            Command::new(&self.lob_bin)
+                .arg("board")
+                .arg(&schematic_py)
+                .arg("--panel")
+                .arg(&panel_toml)
+                .arg("--out")
+                .arg(&board_kicad_pcb),
+        )?;
+        let passed = stage.passed();
+        result.stages.push(stage);
+        if !passed {
+            return Ok(result);
+        }
+        result.board_kicad_pcb = Some(board_kicad_pcb.clone());
+
+        let stage = self.stage(
+            "drc",
+            Command::new(&self.lob_bin).arg("drc").arg(&board_kicad_pcb),
+        )?;
+        result.stages.push(stage);
+
+        Ok(result)
     }
-    result.schematic_py = Some(schematic_py.clone());
-    if panel_toml.exists() {
-        result.panel_toml = Some(panel_toml.clone());
-    }
-
-    let stage = run_stage("run", Command::new(lob_bin).arg("run").arg(&schematic_py))?;
-    let passed = stage.passed();
-    result.stages.push(stage);
-    if !passed {
-        return Ok(result);
-    }
-
-    let board_kicad_pcb = work_dir.join("board.kicad_pcb");
-    let stage = run_stage(
-        "board",
-        Command::new(lob_bin)
-            .arg("board")
-            .arg(&schematic_py)
-            .arg("--panel")
-            .arg(&panel_toml)
-            .arg("--out")
-            .arg(&board_kicad_pcb),
-    )?;
-    let passed = stage.passed();
-    result.stages.push(stage);
-    if !passed {
-        return Ok(result);
-    }
-    result.board_kicad_pcb = Some(board_kicad_pcb.clone());
-
-    let stage = run_stage(
-        "drc",
-        Command::new(lob_bin).arg("drc").arg(&board_kicad_pcb),
-    )?;
-    result.stages.push(stage);
-
-    Ok(result)
-}
-
-fn run_stage(name: &str, cmd: &mut Command) -> Result<StageRun> {
-    let command_str = format!("{cmd:?}");
-    let output = cmd
-        .output()
-        .with_context(|| format!("running stage '{name}' ({command_str})"))?;
-    Ok(StageRun {
-        stage: name.to_string(),
-        command: command_str,
-        exit_code: output.status.code(),
-        stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
-        stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
-    })
 }
 
 #[cfg(test)]
@@ -187,5 +267,11 @@ mod tests {
             ..ok
         };
         assert!(!killed.passed());
+    }
+
+    #[test]
+    fn backend_name_is_recorded() {
+        let backend = LobBackend::new("/bin/lob");
+        assert_eq!(backend.name(), "legion-of-bom");
     }
 }

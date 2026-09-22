@@ -1,0 +1,37 @@
+# PLANNED -- not runnable yet. Lives in tasks/planned/, not tasks/, so it's
+# excluded from both the real eval count (scripts/update-badges.sh) and
+# every_shipped_task_parses_and_has_a_sound_rubric (which only reads
+# tasks/*.toml, one directory deep). It documents a target family
+# (`lc-lowpass-filter`) for whenever legion-of-bom's curated library grows
+# past fuzz-pedal into RF topologies -- a concrete spec to build toward,
+# not a claim that this runs today. See tasks/planned/README.md.
+
+id = "lc-lowpass-filter-v1"
+family = "lc-lowpass-filter"
+brief = """
+A simple LC low-pass filter for cleaning up a 27MHz RF front-end before \
+it reaches the receiver's mixer stage. Third-order, roughly 30MHz cutoff, \
+50-ohm source and load impedance, through-hole inductors and capacitors \
+on a small two-layer board. No active components -- passive filter only.
+"""
+
+[[rubric]]
+id = "stages"
+description = "every pipeline stage that ran exited 0"
+kind = "stages_pass"
+
+[[rubric]]
+id = "confidence"
+description = "every typed decision cleared a reasonable confidence bar"
+kind = "min_decision_confidence"
+threshold = 0.7
+
+[[rubric]]
+id = "drc"
+description = "the generated board is DRC-clean"
+kind = "drc_clean"
+
+[[rubric]]
+id = "vibe"
+description = "reads as a designed filter board, not a pile of parts"
+kind = "subjective"

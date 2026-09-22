@@ -5,6 +5,8 @@
 [![evals](https://img.shields.io/badge/evals-20-orange.svg)](#tasks)
 [![status](https://img.shields.io/badge/status-runs%20end%20to%20end-success.svg)](#status)
 
+*(Badge numbers are generated — run `scripts/update-badges.sh` after a test or task count changes; don't hand-edit them.)*
+
 An eval harness for **typed-decision-driven PCB/hardware design agents**.
 
 Most "AI hardware design" demos are hard to trust because the model is free

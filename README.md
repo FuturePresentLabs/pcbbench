@@ -162,35 +162,35 @@ function of captured artifacts, no human judgment) or **`subjective`**
 can't verify itself). The goal is for that second category to shrink over
 time, not to stay a permanent escape hatch.
 
-### `spice_clips`, and its known gap
+### `spice_clips`
 
 ```toml
 [[rubric]]
 id = "clips"
 description = "input sweep shows real clipping, not a schematic-reading guess"
 kind = "spice_clips"
-min_amplitude_v = 0.1
-max_amplitude_v = 2.0
-min_flat_top_at_max = 0.8
+min_flat_top_at_max = 0.6
 ```
 
 A sine sweep driven into the rendered circuit's input net, scored on the
-flat-topping fraction at `max_amplitude_v` — legion-of-bom's own
-`scope_probe`/`simulate_tran_drive`, live-validated against real fuzz
-circuits (asymmetric BJT clipping, onset ~100-300mV, 80-96% flat-top by
-2V). `input_net_hint` is optional.
-
-**Known gap, same honesty `cadbench` holds `conforms` to**: the runner
-shells out to a `lob scope-probe` subcommand that does not exist in
-legion-of-bom yet (`lob spec`/`schematic`/`run`/`board`/`drc` do). Only
-invoked when a task's rubric actually declares `spice_clips` — no shipped
-task does yet. Expected contract:
-`lob scope-probe <schematic.py> [--input-net-hint NAME] --min-amplitude V --max-amplitude V --out <report.json>`,
-exit 0 whenever the measurement itself ran (regardless of what it found),
-writing `{"flat_top_at_max": <f64>, ...}` to `--out`. The stage
-deliberately doesn't gate `run`/`board`/`drc` — a SPICE measurement
-failing to run is an independent fact from whether the board layout
-succeeds.
+flat-topping fraction at the max drive amplitude — legion-of-bom's own
+`scope_probe`/`simulate_tran_drive` via its `lob scope-probe` subcommand,
+live-verified against a real fuzz circuit both ways: a log-spaced
+0.005V-1.0V/8-step sweep climbing 7%→7%→12%→34%→66% flat-top (-8.8dB
+compression) on the happy path, and a clear nonzero-exit error naming the
+real available nets when pointed at a nonexistent one.
+`input_net_hint`/`freq_hz`/`min_amplitude_v`/`max_amplitude_v`/`steps` are
+all optional — `lob scope-probe` has sensible built-in defaults for the
+sweep itself (net inference, 200Hz, 0.005V-1V, 8 log-spaced steps); a task
+only overrides what it actually needs to. `min_flat_top_at_max` is the one
+required field — there's no universally sane "clips enough" bar. Only
+invoked when a task's rubric actually declares `spice_clips` (unlike
+`drc`/`board`, which always run), and deliberately doesn't gate
+`run`/`board`/`drc` on failure — a SPICE measurement and
+board-layout success are independent facts about the design. No shipped
+task uses this check yet; the report JSON also carries the full per-point
+sweep (`points: [{amplitude_v, gain, gain_db, flat_top}, ...]`) if a
+future scorer wants more than the one threshold field.
 
 ## Alternatives
 

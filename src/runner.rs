@@ -209,8 +209,10 @@ impl Backend<Check> for LobBackend {
 
         if let Some(Check::SpiceClips {
             input_net_hint,
+            freq_hz,
             min_amplitude_v,
             max_amplitude_v,
+            steps,
             ..
         }) = task
             .rubric
@@ -222,14 +224,25 @@ impl Backend<Check> for LobBackend {
             let mut cmd = Command::new(&self.lob_bin);
             cmd.arg("scope-probe")
                 .arg(&schematic_py)
-                .arg("--min-amplitude")
-                .arg(min_amplitude_v.to_string())
-                .arg("--max-amplitude")
-                .arg(max_amplitude_v.to_string())
                 .arg("--out")
                 .arg(&scope_probe_json);
+            // Every sweep parameter below has a sensible default on
+            // `lob scope-probe`'s own side -- only pass what the task
+            // actually overrides, same as `input_net_hint`.
             if let Some(hint) = input_net_hint {
                 cmd.arg("--input-net-hint").arg(hint);
+            }
+            if let Some(freq_hz) = freq_hz {
+                cmd.arg("--freq-hz").arg(freq_hz.to_string());
+            }
+            if let Some(min_amplitude_v) = min_amplitude_v {
+                cmd.arg("--min-amplitude").arg(min_amplitude_v.to_string());
+            }
+            if let Some(max_amplitude_v) = max_amplitude_v {
+                cmd.arg("--max-amplitude").arg(max_amplitude_v.to_string());
+            }
+            if let Some(steps) = steps {
+                cmd.arg("--steps").arg(steps.to_string());
             }
             // Deliberately no early-return on failure here: a SPICE
             // measurement stage failing to run (crashed, no recognizable

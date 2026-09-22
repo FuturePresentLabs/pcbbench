@@ -39,18 +39,21 @@ pub enum Check {
     /// fuzz circuits: asymmetric BJT clipping, onset ~100-300mV,
     /// saturating toward 80-96% flat-top by 2V).
     ///
-    /// `input_net_hint` is optional — the runner's `lob scope-probe`
-    /// subcommand falls back to its own net-recognition when absent.
-    /// `min_amplitude_v`/`max_amplitude_v` bound the sweep; the check
-    /// passes when the flat-topping fraction at `max_amplitude_v` clears
-    /// `min_flat_top_at_max`. A task-specific sweep, not a universal
-    /// default — the runner only invokes `scope-probe` when a task's
-    /// rubric actually declares this check, unlike `DrcClean`/`StagesPass`
-    /// which always run.
+    /// `input_net_hint`, `freq_hz`, `min_amplitude_v`, `max_amplitude_v`,
+    /// and `steps` are all optional — `lob scope-probe` has sensible
+    /// built-in defaults for the sweep itself (net inference, 200Hz,
+    /// 0.005V-1V, 8 log-spaced steps); a task only overrides what it
+    /// actually needs to. `min_flat_top_at_max` has no such default (there
+    /// is no universally sane "clips enough" bar) and is required. The
+    /// runner only invokes `scope-probe` when a task's rubric actually
+    /// declares this check, unlike `DrcClean`/`StagesPass` which always
+    /// run.
     SpiceClips {
         input_net_hint: Option<String>,
-        min_amplitude_v: f64,
-        max_amplitude_v: f64,
+        freq_hz: Option<f64>,
+        min_amplitude_v: Option<f64>,
+        max_amplitude_v: Option<f64>,
+        steps: Option<u32>,
         min_flat_top_at_max: f64,
     },
     /// Not automated — a human fills this in. Named explicitly (not just
@@ -108,16 +111,36 @@ mod tests {
     fn spice_clips_round_trips_with_an_optional_net_hint() {
         let check = Check::SpiceClips {
             input_net_hint: Some("IN".into()),
-            min_amplitude_v: 0.1,
-            max_amplitude_v: 2.0,
-            min_flat_top_at_max: 0.8,
+            freq_hz: Some(1000.0),
+            min_amplitude_v: Some(0.005),
+            max_amplitude_v: Some(1.0),
+            steps: Some(8),
+            min_flat_top_at_max: 0.6,
         };
         let text = toml::to_string_pretty(&check).unwrap();
         let back: Check = toml::from_str(&text).unwrap();
         assert!(matches!(
             back,
             Check::SpiceClips { input_net_hint: Some(ref h), min_flat_top_at_max, .. }
-                if h == "IN" && min_flat_top_at_max == 0.8
+                if h == "IN" && min_flat_top_at_max == 0.6
+        ));
+    }
+
+    #[test]
+    fn spice_clips_round_trips_with_every_sweep_param_left_to_lobs_own_defaults() {
+        let check = Check::SpiceClips {
+            input_net_hint: None,
+            freq_hz: None,
+            min_amplitude_v: None,
+            max_amplitude_v: None,
+            steps: None,
+            min_flat_top_at_max: 0.6,
+        };
+        let text = toml::to_string_pretty(&check).unwrap();
+        let back: Check = toml::from_str(&text).unwrap();
+        assert!(matches!(
+            back,
+            Check::SpiceClips { input_net_hint: None, freq_hz: None, .. }
         ));
     }
 

@@ -162,6 +162,22 @@ yet, so a task file is honest about what it can't verify itself). The goal
 is for that second category to shrink over time, not to stay a permanent
 escape hatch.
 
+## Alternatives
+
+Other benchmarks in this space, for context and future comparison — not
+wired up here, listed so a future "how does `lob` compare" question has
+somewhere real to point:
+
+- **[HWE-Bench](https://arxiv.org/pdf/2603.18102)** — 300 board-level
+  schematic-design tasks sourced from GitHub/OSHWLab across 8 application
+  domains, backed by a 2,914-datasheet knowledge base, scored by electrical
+  rules checking followed by circuit simulation. Top reported model: an
+  8.15% pass rate — a genuinely hard bar.
+- **PCB-Bench** (academic) — ~3,700 text questions, 500 image-text
+  questions, 174 real projects.
+- **PCBWorld** — KiCad-engine-grounded routing with a DRC-feedback loop;
+  closest shape match to this repo's own `spec → schematic → drc` pipeline.
+
 ## License
 
 AGPL-3.0-or-later.

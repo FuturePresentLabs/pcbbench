@@ -1,0 +1,30 @@
+id = "fuzz-pedal-enclosure-contradiction-v1"
+family = "fuzz-pedal"
+brief = """
+Need this to fit on an already-packed pedalboard, so as compact as \
+possible -- but I also want room inside for an extra trim pot and maybe a \
+second footswitch down the line, so don't make it too cramped to work in. \
+Silicon fuzz, middle-of-the-road voice, nothing extreme either bright or \
+dark. 9V, true bypass.
+"""
+
+[[rubric]]
+id = "stages"
+description = "every pipeline stage that ran exited 0"
+kind = "stages_pass"
+
+[[rubric]]
+id = "confidence"
+description = "every typed decision cleared a reasonable confidence bar -- stress test on the enclosure-size decision specifically: 'as compact as possible' and 'room to work inside' pull in opposite directions, mirroring the existing ambiguous-voice task but for enclosure instead of voice"
+kind = "min_decision_confidence"
+threshold = 0.7
+
+[[rubric]]
+id = "drc"
+description = "the generated board is DRC-clean"
+kind = "drc_clean"
+
+[[rubric]]
+id = "vibe"
+description = "reads as a designed fuzz pedal, not a pile of parts"
+kind = "subjective"

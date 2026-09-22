@@ -1,0 +1,29 @@
+id = "fuzz-pedal-blues-warm-v1"
+family = "fuzz-pedal"
+brief = """
+Blues player, wants a fuzz that stays warm and touch-sensitive -- cleans \
+up nicely when I roll back the guitar's volume, doesn't turn to static. \
+Not looking for anything harsh or fizzy on top. 9V, true bypass, standard \
+pedalboard footprint.
+"""
+
+[[rubric]]
+id = "stages"
+description = "every pipeline stage that ran exited 0"
+kind = "stages_pass"
+
+[[rubric]]
+id = "confidence"
+description = "every typed decision cleared a reasonable confidence bar -- voice signaled indirectly (warm, not harsh/fizzy) via a blues-player framing rather than named directly"
+kind = "min_decision_confidence"
+threshold = 0.7
+
+[[rubric]]
+id = "drc"
+description = "the generated board is DRC-clean"
+kind = "drc_clean"
+
+[[rubric]]
+id = "vibe"
+description = "reads as a designed fuzz pedal, not a pile of parts"
+kind = "subjective"

@@ -2,6 +2,7 @@
 
 [![license](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue.svg)](#license)
 [![tests](https://img.shields.io/badge/tests-8%20passing-brightgreen.svg)](#status)
+[![evals](https://img.shields.io/badge/evals-20-orange.svg)](#tasks)
 [![status](https://img.shields.io/badge/status-runs%20end%20to%20end-success.svg)](#status)
 
 An eval harness for **typed-decision-driven PCB/hardware design agents**.
@@ -48,11 +49,11 @@ architecture.
 
 ## Status
 
-**Runs end to end.** 8 unit tests, three tasks, one backend
-(legion-of-bom). The runner wires the full `spec → schematic → run → board
-→ drc` chain, deriving the panel TOML from the spec's enclosure-size
-decision along the way — so `drc_clean` is a real pass/fail against a board
-legion-of-bom actually placed and routed, not a "did not run."
+**Runs end to end.** 8 unit tests, 20 tasks, one backend (legion-of-bom).
+The runner wires the full `spec → schematic → run → board → drc` chain,
+deriving the panel TOML from the spec's enclosure-size decision along the
+way — so `drc_clean` is a real pass/fail against a board legion-of-bom
+actually placed and routed, not a "did not run."
 
 We're planning to publish real benchmark results here as the design-agent
 and rubric mature — this repo being public from the start is part of that.
@@ -73,16 +74,64 @@ the rest of the pipeline without spending a live decision call each time.
 
 ## Tasks
 
-Three, all under `tasks/`, one circuit family (`fuzz-pedal`) with different
-briefs stressing different parts of the rubric:
+20, all under `tasks/`, one circuit family (`fuzz-pedal`, the only topology
+legion-of-bom's curated library has today — a silicon two-transistor
+common-emitter fuzz). Every task varies the *brief*, stressing one of two
+real typed decisions the backend makes: bias voice (bright/symmetric/dark)
+and enclosure size. Grouped by what each one is testing:
 
-- **`fuzz-pedal-v1`** — the baseline: terse, minimally specified.
-- **`fuzz-pedal-explicit-voice-v1`** — voice and enclosure both stated
-  plainly. A positive control: this should score high on confidence.
-- **`fuzz-pedal-ambiguous-voice-v1`** — asks for "warm and vintage" *and*
-  "aggressive, cuts through a mix" in the same brief. Those pull the
-  bias-voice decision in opposite directions on purpose — a stress test for
-  the confidence criterion.
+**Baseline & positive controls** — voice and enclosure both stated plainly,
+should score confidently:
+
+- **`fuzz-pedal-v1`** — the original baseline, terse.
+- **`fuzz-pedal-explicit-voice-v1`** — bright + smallest enclosure, named
+  directly.
+- **`fuzz-pedal-garage-rock-v1`** — bright/cutting + smallest enclosure, via
+  a 60s-garage framing.
+- **`fuzz-pedal-doom-stoner-v1`** — dark/thick + larger enclosure, via a
+  downtuned-baritone framing.
+- **`fuzz-pedal-budget-build-v1`** — bright + smallest enclosure, via a
+  first-build/cost-conscious framing.
+- **`fuzz-pedal-boutique-premium-v1`** — dark/vintage + standard enclosure,
+  via a no-cost-cutting framing.
+- **`fuzz-pedal-fuzzface-lineage-v1`** — names the curated topology's actual
+  mechanism directly (silicon, two-transistor, rail-clipping); a sanity
+  check that a brief matching reality scores well.
+
+**Indirect voice framing** — same three voice targets, signaled through
+genre/reference language rather than named:
+
+- **`fuzz-pedal-blues-warm-v1`** — warm/touch-sensitive, blues framing.
+- **`fuzz-pedal-metal-cut-v1`** — bright/cutting, metal framing.
+- **`fuzz-pedal-shoegaze-wall-v1`** — dark/smeared, ambient framing.
+- **`fuzz-pedal-symmetric-balanced-v1`** — even-handed, stated directly.
+- **`fuzz-pedal-indie-versatile-v1`** — even-handed, via a versatility
+  framing.
+
+**Stress cases** — deliberately hard, expected to strain the confidence
+criterion or a stage:
+
+- **`fuzz-pedal-ambiguous-voice-v1`** — "warm/vintage" and
+  "aggressive/cuts through" in the same brief, pulling bias-voice in
+  opposite directions.
+- **`fuzz-pedal-enclosure-contradiction-v1`** — "as compact as possible"
+  and "room to work inside," pulling enclosure-size in opposite directions.
+- **`fuzz-pedal-germanium-out-of-scope-v1`** — asks for a germanium
+  three-transistor circuit; the curated library only has silicon
+  two-transistor. Expected to surface as a capability mismatch, not a
+  silent substitution.
+
+**Signal-to-noise** — real signal present but buried in verbosity, or
+absent entirely:
+
+- **`fuzz-pedal-tour-story-verbose-v1`** — bright/compact, buried in
+  touring-band backstory.
+- **`fuzz-pedal-pedalboard-chain-verbose-v1`** — dark/roomier, buried in
+  signal-chain context.
+- **`fuzz-pedal-terse-aggressive-v1`** / **`fuzz-pedal-terse-dark-v1`** —
+  one-sentence briefs, minimal signal.
+- **`fuzz-pedal-trust-the-builder-v1`** — explicitly defers the voice
+  decision entirely ("you pick").
 
 ## Task format
 

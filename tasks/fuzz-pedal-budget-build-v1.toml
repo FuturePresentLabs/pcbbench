@@ -1,0 +1,29 @@
+id = "fuzz-pedal-budget-build-v1"
+family = "fuzz-pedal"
+brief = """
+First pedal build, keeping it simple and cheap -- nothing exotic, just a \
+straightforward silicon fuzz that works. Classic bright, cutting fuzz \
+tone, nothing subtle about it. 9V battery, true bypass, smallest standard \
+enclosure to keep the cost down.
+"""
+
+[[rubric]]
+id = "stages"
+description = "every pipeline stage that ran exited 0"
+kind = "stages_pass"
+
+[[rubric]]
+id = "confidence"
+description = "every typed decision cleared a reasonable confidence bar -- a budget/beginner-framed positive control: voice and enclosure both stated plainly, different tone from the touring/genre-heavy tasks"
+kind = "min_decision_confidence"
+threshold = 0.7
+
+[[rubric]]
+id = "drc"
+description = "the generated board is DRC-clean"
+kind = "drc_clean"
+
+[[rubric]]
+id = "vibe"
+description = "reads as a designed fuzz pedal, not a pile of parts"
+kind = "subjective"

@@ -1,0 +1,30 @@
+id = "fuzz-pedal-boutique-premium-v1"
+family = "fuzz-pedal"
+brief = """
+Boutique build, no cost-cutting -- hand-selected transistors, the works. \
+Dark, thick, vintage-leaning voice, the kind of fuzz that sounds like it's \
+been sitting in a tube amp for fifty years. 9V, true bypass, standard \
+enclosure, nothing unusual about the size -- the premium part is in the \
+build quality, not the footprint.
+"""
+
+[[rubric]]
+id = "stages"
+description = "every pipeline stage that ran exited 0"
+kind = "stages_pass"
+
+[[rubric]]
+id = "confidence"
+description = "every typed decision cleared a reasonable confidence bar -- a boutique-framed positive control: voice stated plainly (dark/vintage), enclosure explicitly standard"
+kind = "min_decision_confidence"
+threshold = 0.7
+
+[[rubric]]
+id = "drc"
+description = "the generated board is DRC-clean"
+kind = "drc_clean"
+
+[[rubric]]
+id = "vibe"
+description = "reads as a designed fuzz pedal, not a pile of parts"
+kind = "subjective"

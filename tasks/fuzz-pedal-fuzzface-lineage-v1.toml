@@ -1,0 +1,31 @@
+id = "fuzz-pedal-fuzzface-lineage-v1"
+family = "fuzz-pedal"
+brief = """
+Silicon Fuzz Face-style circuit, two-transistor, the classic mechanism -- \
+not a diode-clipping distortion pedal dressed up as a fuzz. Voice should \
+land somewhere in the middle, not pushed hard toward bright or dark; the \
+point is the classic mechanism, not an extreme voicing. 9V battery, true \
+bypass, round enclosure isn't required -- standard rectangular \
+single-footswitch box is fine.
+"""
+
+[[rubric]]
+id = "stages"
+description = "every pipeline stage that ran exited 0"
+kind = "stages_pass"
+
+[[rubric]]
+id = "confidence"
+description = "every typed decision cleared a reasonable confidence bar -- names the curated topology's actual mechanism directly (silicon, two-transistor, rail-clipping via transistors not diodes) as a sanity check that a brief matching the real topology scores well"
+kind = "min_decision_confidence"
+threshold = 0.7
+
+[[rubric]]
+id = "drc"
+description = "the generated board is DRC-clean"
+kind = "drc_clean"
+
+[[rubric]]
+id = "vibe"
+description = "reads as a designed fuzz pedal, not a pile of parts"
+kind = "subjective"

@@ -1,0 +1,35 @@
+id = "fuzz-pedal-pedalboard-chain-verbose-v1"
+family = "fuzz-pedal"
+brief = """
+Building out a board that's compressor into overdrive into this fuzz into \
+a reverb/delay pair, all running off a single isolated power brick with a \
+9V tap for this one. The overdrive ahead of it is already fairly hot, so \
+this doesn't need to add more brightness or edge on top -- if anything it \
+should smooth things out, sit warm and a little woolly under the rest of \
+the chain rather than cut through it, closer to a Dark Side of the Moon \
+kind of fuzz than a Ramones kind of fuzz. True bypass to keep the rest of \
+the chain's tone intact when it's off. Room on the board is tight but not \
+razor thin -- would rather have a slightly bigger enclosure with more room \
+to work inside than the absolute smallest footprint.
+"""
+
+[[rubric]]
+id = "stages"
+description = "every pipeline stage that ran exited 0"
+kind = "stages_pass"
+
+[[rubric]]
+id = "confidence"
+description = "every typed decision cleared a reasonable confidence bar -- verbose brief, real signal (dark/warm, room to spare) buried in signal-chain context"
+kind = "min_decision_confidence"
+threshold = 0.7
+
+[[rubric]]
+id = "drc"
+description = "the generated board is DRC-clean"
+kind = "drc_clean"
+
+[[rubric]]
+id = "vibe"
+description = "reads as a designed fuzz pedal, not a pile of parts"
+kind = "subjective"

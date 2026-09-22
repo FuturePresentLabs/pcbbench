@@ -1,0 +1,29 @@
+id = "fuzz-pedal-germanium-out-of-scope-v1"
+family = "fuzz-pedal"
+brief = """
+A three-transistor germanium fuzz, old-school NKT275-style devices, hand \
+matched for gain and leakage, biased with a trim pot for temperature \
+drift. Warm, splatty, cleans up with the guitar's volume knob the way the \
+old germanium circuits do. 9V, true bypass, standard enclosure.
+"""
+
+[[rubric]]
+id = "stages"
+description = "every pipeline stage that ran exited 0 -- this brief asks for a germanium, three-transistor circuit; the curated library only has a silicon two-transistor topology, so this is expected to surface as a capability mismatch rather than quietly substituting the wrong circuit"
+kind = "stages_pass"
+
+[[rubric]]
+id = "confidence"
+description = "every typed decision cleared a reasonable confidence bar"
+kind = "min_decision_confidence"
+threshold = 0.7
+
+[[rubric]]
+id = "drc"
+description = "the generated board is DRC-clean"
+kind = "drc_clean"
+
+[[rubric]]
+id = "vibe"
+description = "not automated -- a human judges whether the failure mode here (declining a germanium/three-transistor request rather than silently substituting the curated silicon topology) is the right one"
+kind = "subjective"

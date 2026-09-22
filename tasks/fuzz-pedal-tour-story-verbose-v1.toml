@@ -1,0 +1,35 @@
+id = "fuzz-pedal-tour-story-verbose-v1"
+family = "fuzz-pedal"
+brief = """
+We're a three-piece touring out of a van, playing mostly 300-400 cap rooms, \
+and our current fuzz just died somewhere between Tulsa and Amarillo -- \
+third pedal this tour to go down, so whatever we build next needs to \
+actually survive being thrown in a road case with everything else. \
+Guitarist wants something that cuts through a dense, loud mix without \
+getting lost under the bass and drums -- we're not a quiet band. Silicon \
+fuzz, 9V battery since we don't always have a clean power supply backstage, \
+true bypass so it doesn't color the tone when it's off. Standard \
+single-footswitch size, needs to fit on a crowded board next to three \
+other pedals.
+"""
+
+[[rubric]]
+id = "stages"
+description = "every pipeline stage that ran exited 0"
+kind = "stages_pass"
+
+[[rubric]]
+id = "confidence"
+description = "every typed decision cleared a reasonable confidence bar -- verbose brief, real signal (bright/cutting, compact) buried in touring-band backstory"
+kind = "min_decision_confidence"
+threshold = 0.7
+
+[[rubric]]
+id = "drc"
+description = "the generated board is DRC-clean"
+kind = "drc_clean"
+
+[[rubric]]
+id = "vibe"
+description = "reads as a designed fuzz pedal, not a pile of parts"
+kind = "subjective"

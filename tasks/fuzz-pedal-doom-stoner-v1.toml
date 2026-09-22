@@ -1,0 +1,32 @@
+id = "fuzz-pedal-doom-stoner-v1"
+family = "fuzz-pedal"
+brief = """
+Doom/stoner rig, downtuned baritone guitar through a wall of cabs. Want a \
+thick, dark, low-scooped-but-still-massive fuzz, not a bright buzzy one -- \
+the low end needs to stay huge, not get thinned out by the clipping. 9V \
+adapter (no battery, this thing never leaves the board), true bypass. \
+Enclosure can be a bit bigger than the smallest option -- there's a second \
+footswitch going in next to it down the line and I'd rather have room to \
+work now than re-house it later.
+"""
+
+[[rubric]]
+id = "stages"
+description = "every pipeline stage that ran exited 0"
+kind = "stages_pass"
+
+[[rubric]]
+id = "confidence"
+description = "every typed decision cleared a reasonable confidence bar -- positive control: dark/thick voice and a larger-than-smallest enclosure are both stated plainly, just indirectly"
+kind = "min_decision_confidence"
+threshold = 0.7
+
+[[rubric]]
+id = "drc"
+description = "the generated board is DRC-clean"
+kind = "drc_clean"
+
+[[rubric]]
+id = "vibe"
+description = "reads as a designed fuzz pedal, not a pile of parts"
+kind = "subjective"

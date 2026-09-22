@@ -1,0 +1,28 @@
+id = "fuzz-pedal-explicit-voice-v1"
+family = "fuzz-pedal"
+brief = """
+Bright, aggressive silicon fuzz -- the kind that cuts through a dense mix, \
+not a warm vintage smear. 9V battery or standard center-negative adapter, \
+true bypass, standard single-footswitch pedal enclosure.
+"""
+
+[[rubric]]
+id = "stages"
+description = "every pipeline stage that ran exited 0"
+kind = "stages_pass"
+
+[[rubric]]
+id = "confidence"
+description = "every typed decision cleared a reasonable confidence bar -- a positive control: the voice and enclosure are both stated plainly, so this should score high"
+kind = "min_decision_confidence"
+threshold = 0.7
+
+[[rubric]]
+id = "drc"
+description = "the generated board is DRC-clean"
+kind = "drc_clean"
+
+[[rubric]]
+id = "vibe"
+description = "reads as a designed fuzz pedal, not a pile of parts"
+kind = "subjective"

@@ -96,4 +96,66 @@ mod tests {
         );
         assert!(matches!(back.rubric[3].check, Check::Subjective));
     }
+
+    /// Every shipped task file is part of the harness's contract, not sample
+    /// data: if one stops parsing, or quietly loses a criterion, every score
+    /// it ever produces is wrong. Parses every real file under `tasks/`
+    /// rather than naming one, so a new task file is covered the moment it's
+    /// added -- no test to remember to write alongside it. (Mirrors
+    /// cadbench's `every_shipped_task_parses_and_has_a_sound_rubric`, kept
+    /// deliberately identical in shape.)
+    #[test]
+    fn every_shipped_task_parses_and_has_a_sound_rubric() {
+        let tasks_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/tasks");
+        let mut checked = 0;
+        for entry in std::fs::read_dir(tasks_dir).expect("tasks/ is readable") {
+            let path = entry.expect("dir entry readable").path();
+            if path.extension().and_then(|e| e.to_str()) != Some("toml") {
+                continue;
+            }
+            let text = std::fs::read_to_string(&path)
+                .unwrap_or_else(|e| panic!("{} is readable: {e}", path.display()));
+            let task: Task = toml::from_str(&text)
+                .unwrap_or_else(|e| panic!("{} parses: {e}", path.display()));
+
+            assert!(!task.id.trim().is_empty(), "{}: empty id", path.display());
+            assert!(
+                !task.family.trim().is_empty(),
+                "{}: empty family",
+                path.display()
+            );
+            assert!(
+                !task.brief.trim().is_empty(),
+                "{}: empty brief",
+                path.display()
+            );
+
+            assert!(
+                task.rubric.iter().any(|c| matches!(c.check, Check::StagesPass)),
+                "{}: missing a stages_pass criterion",
+                path.display()
+            );
+            assert!(
+                task.rubric.iter().any(|c| matches!(c.check, Check::DrcClean)),
+                "{}: missing a drc_clean criterion",
+                path.display()
+            );
+            assert!(
+                task.rubric
+                    .iter()
+                    .any(|c| matches!(c.check, Check::MinDecisionConfidence { .. })),
+                "{}: missing a min_decision_confidence criterion",
+                path.display()
+            );
+
+            let mut ids: Vec<&str> = task.rubric.iter().map(|c| c.id.as_str()).collect();
+            ids.sort_unstable();
+            let before = ids.len();
+            ids.dedup();
+            assert_eq!(ids.len(), before, "{}: duplicate rubric ids", path.display());
+
+            checked += 1;
+        }
+        assert!(checked > 0, "tasks/ has no .toml files to check");
+    }
 }

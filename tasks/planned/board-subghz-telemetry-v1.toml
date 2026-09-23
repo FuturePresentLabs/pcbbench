@@ -1,0 +1,28 @@
+# PLANNED -- the board family runs this brief end to end through lob run (a
+# CC1101 + STM32G0B1 node, 2026-09-23); not yet scored through board + drc.
+# Move up into tasks/ once a live run has been scored (tasks/planned/README.md).
+
+id = "board-subghz-telemetry-v1"
+family = "board"
+brief = "A small 915 MHz ISM-band telemetry node: an STM32 microcontroller talking to a sub-GHz radio with an SMA antenna connector, powered from USB-C 5V. No audio."
+
+[[rubric]]
+id = "stages"
+description = "every pipeline stage that ran exited 0"
+kind = "stages_pass"
+
+[[rubric]]
+id = "confidence"
+description = "every typed decision cleared a reasonable confidence bar -- the radio, the MCU and the regulator, not just the requirements"
+kind = "min_decision_confidence"
+threshold = 0.7
+
+[[rubric]]
+id = "drc"
+description = "the generated board is DRC-clean"
+kind = "drc_clean"
+
+[[rubric]]
+id = "vibe"
+description = "reads as a designed RF node: the radio's matching network tight between its RF pins and the SMA, crystal at the radio's XOSC pins, decoupling at the pins, a ground plane under the RF path"
+kind = "subjective"

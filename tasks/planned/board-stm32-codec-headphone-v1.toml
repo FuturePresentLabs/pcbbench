@@ -1,9 +1,10 @@
-# PLANNED -- the stm32-codec family exists in legion-of-bom (mcu_audio.rs) but
-# has not yet been scored by a live run end to end. Move up into tasks/ once it
-# has (tasks/planned/README.md).
+# PLANNED -- the board family (catalog-driven synthesis, legion-of-bom synth.rs)
+# runs this brief end to end through lob run; the board stage has not yet laid
+# out the H743 LQFP-100 in reasonable time. Move up into tasks/ once a live run
+# has been scored (tasks/planned/README.md).
 
-id = "stm32-codec-headphone-v1"
-family = "stm32-codec"
+id = "board-stm32-codec-headphone-v1"
+family = "board"
 brief = "A battery-friendly STM32H7 audio board that drives headphones directly and has two selectable stereo inputs, 3.3 V only, low power."
 
 [[rubric]]

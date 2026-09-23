@@ -268,16 +268,16 @@ impl Backend<Check> for LobBackend {
         }
 
         let board_kicad_pcb = work_dir.join("board.kicad_pcb");
-        let stage = self.stage(
-            "board",
-            Command::new(&self.lob_bin)
-                .arg("board")
-                .arg(&schematic_py)
-                .arg("--panel")
-                .arg(&panel_toml)
-                .arg("--out")
-                .arg(&board_kicad_pcb),
-        )?;
+        let mut cmd = Command::new(&self.lob_bin);
+        cmd.arg("board").arg(&schematic_py);
+        // Only a family that has a panel writes one (a fuzz pedal's
+        // enclosure; an MCU board has none) -- without it the backend
+        // derives the outline from the parts, which is the right answer
+        // there, not a missing input.
+        if let Some(panel) = &result.panel_toml {
+            cmd.arg("--panel").arg(panel);
+        }
+        let stage = self.stage("board", cmd.arg("--out").arg(&board_kicad_pcb))?;
         let passed = stage.passed();
         result.stages.push(stage);
         if !passed {

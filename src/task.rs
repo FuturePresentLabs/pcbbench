@@ -75,6 +75,7 @@ mod tests {
             id: "fuzz-pedal-v1".into(),
             family: "fuzz-pedal".into(),
             brief: "vintage silicon fuzz, 9V, true bypass".into(),
+            input: None,
             rubric: vec![
                 Criterion {
                     id: "stages".into(),

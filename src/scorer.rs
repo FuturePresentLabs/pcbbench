@@ -256,6 +256,7 @@ mod tests {
             id: "t".into(),
             family: "fuzz-pedal".into(),
             brief: "b".into(),
+            input: None,
             rubric: vec![Criterion {
                 id: "vibe".into(),
                 description: "d".into(),
@@ -274,6 +275,7 @@ mod tests {
             id: "t".into(),
             family: "fuzz-pedal".into(),
             brief: "b".into(),
+            input: None,
             rubric: vec![Criterion {
                 id: "stages".into(),
                 description: "d".into(),

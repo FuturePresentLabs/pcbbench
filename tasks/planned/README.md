@@ -27,3 +27,10 @@ Current planned families:
   whether the topology-DAG approach generalizes past gain-stage circuits.
 - **`linear-regulator`** — a simple general-EE task, deliberately
   unambiguous (a positive control once the family exists).
+- **`stm32-codec`** — an STM32H743 audio board with one of three codec
+  options (PCM5102A + PCM1808, WM8731, ES8388), decided from the brief. The
+  first digital-board family: a 0.5 mm-pitch LQFP-100, cited decoupling, a
+  crystal, SWD pads, I2S/SAI. Three tasks, each written so a different codec
+  is the fitting answer (no control bus / a microphone input / headphones).
+  Exists in legion-of-bom (`crates/core/src/mcu_audio.rs`); not yet scored end
+  to end — the board stage's layout of a 100-pin LQFP is the open question.

@@ -1,0 +1,28 @@
+# PLANNED -- the stm32-codec family exists in legion-of-bom (mcu_audio.rs) but
+# has not yet been scored by a live run end to end. Move up into tasks/ once it
+# has (tasks/planned/README.md).
+
+id = "stm32-codec-headphone-v1"
+family = "stm32-codec"
+brief = "A battery-friendly STM32H7 audio board that drives headphones directly and has two selectable stereo inputs, 3.3 V only, low power."
+
+[[rubric]]
+id = "stages"
+description = "every pipeline stage that ran exited 0"
+kind = "stages_pass"
+
+[[rubric]]
+id = "confidence"
+description = "the codec decision cleared a reasonable confidence bar -- headphone drive, two stereo inputs and low power point at the ES8388"
+kind = "min_decision_confidence"
+threshold = 0.7
+
+[[rubric]]
+id = "drc"
+description = "the generated board is DRC-clean"
+kind = "drc_clean"
+
+[[rubric]]
+id = "vibe"
+description = "reads as a designed MCU audio board: decoupling at the pins, crystal at the oscillator pins, codec near the SAI pins"
+kind = "subjective"

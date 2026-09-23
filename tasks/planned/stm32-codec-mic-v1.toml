@@ -1,0 +1,28 @@
+# PLANNED -- the stm32-codec family exists in legion-of-bom (mcu_audio.rs) but
+# has not yet been scored by a live run end to end. Move up into tasks/ once it
+# has (tasks/planned/README.md).
+
+id = "stm32-codec-mic-v1"
+family = "stm32-codec"
+brief = "An STM32H7 board for a voice-controlled prototype: it needs a microphone input with bias as well as line in and line out, running from a single 3.3 V rail."
+
+[[rubric]]
+id = "stages"
+description = "every pipeline stage that ran exited 0"
+kind = "stages_pass"
+
+[[rubric]]
+id = "confidence"
+description = "the codec decision cleared a reasonable confidence bar -- a microphone input with bias points at the WM8731, the option with a mic input and MICBIAS"
+kind = "min_decision_confidence"
+threshold = 0.7
+
+[[rubric]]
+id = "drc"
+description = "the generated board is DRC-clean"
+kind = "drc_clean"
+
+[[rubric]]
+id = "vibe"
+description = "reads as a designed MCU audio board: decoupling at the pins, crystal at the oscillator pins, codec near the SAI pins"
+kind = "subjective"

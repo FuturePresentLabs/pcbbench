@@ -145,7 +145,13 @@ fn read_trace_confidences(path: &Path) -> anyhow::Result<Vec<(String, f64)>> {
         .filter_map(|r| {
             let key = r.get("key")?.as_str()?.to_string();
             let confidence = r.get("confidence")?.as_f64()?;
-            Some((key, confidence))
+            // ooda records a yes/no (noul) answer's probability as its
+            // confidence; a firm NO at p = 0.02 is 0.98 sure, not 0.02.
+            let decisive = match r.get("kind").and_then(Value::as_str) {
+                Some("noul") => confidence.max(1.0 - confidence),
+                _ => confidence,
+            };
+            Some((key, decisive))
         })
         .collect())
 }
@@ -190,8 +196,9 @@ mod tests {
         let trace_path = dir.join("trace.json");
         std::fs::write(
             &trace_path,
-            r#"[{"key":"a","type":"choice","chosen":"x","confidence":0.9,"timestamp_unix":0},
-                {"key":"b","type":"noul","chosen":"0.400","confidence":0.4,"timestamp_unix":0}]"#,
+            r#"[{"key":"a","kind":"choice","chosen":"x","confidence":0.9,"timestamp_unix":0},
+                {"key":"b","kind":"noul","chosen":"0.400","confidence":0.4,"timestamp_unix":0},
+                {"key":"c","kind":"noul","chosen":"0.020","confidence":0.02,"timestamp_unix":0}]"#,
         )
         .unwrap();
         let run = RunResult {
@@ -200,7 +207,9 @@ mod tests {
         };
         let (verdict, detail) = score_min_confidence(&run, 0.7);
         assert_eq!(verdict, Verdict::Fail);
-        assert!(detail.contains("b=0.40"));
+        // A hedged yes/no (p = 0.4) is 0.6 sure; a firm no (p = 0.02) is 0.98.
+        assert!(detail.contains("b=0.60"), "{detail}");
+        assert!(!detail.contains("c="), "{detail}");
         std::fs::remove_dir_all(&dir).ok();
     }
 

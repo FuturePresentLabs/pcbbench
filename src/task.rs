@@ -141,7 +141,11 @@ mod tests {
         let back: Check = toml::from_str(&text).unwrap();
         assert!(matches!(
             back,
-            Check::SpiceClips { input_net_hint: None, freq_hz: None, .. }
+            Check::SpiceClips {
+                input_net_hint: None,
+                freq_hz: None,
+                ..
+            }
         ));
     }
 
